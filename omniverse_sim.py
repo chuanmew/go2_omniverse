@@ -84,6 +84,9 @@ import custom_rl_env
 
 from omnigraph import create_front_cam_omnigraph
 
+from get_ros_obs import add_ros_obs_sub, add_keyboard_subscription
+ros_obs = torch.zeros((1,235), dtype=torch.float32, device='cuda')
+
 
 def sub_keyboard_event(event, *args, **kwargs) -> bool:
 
@@ -151,6 +154,13 @@ def add_cmd_sub(num_envs):
     thread.start()
 
 
+def ros_obs_thread(ros_obs):
+    node = rclpy.create_node('real_obs')
+    add_ros_obs_sub(ros_obs, node)
+    # Spin in a separate thread
+    thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
+    thread.start()
+
 
 def specify_cmd_for_robots(numv_envs):
     for i in range(numv_envs):
@@ -161,7 +171,7 @@ def run_sim():
     _input = carb.input.acquire_input_interface()
     _appwindow = omni.appwindow.get_default_app_window()
     _keyboard = _appwindow.get_keyboard()
-    _sub_keyboard = _input.subscribe_to_keyboard_events(_keyboard, sub_keyboard_event)
+    # _sub_keyboard = _input.subscribe_to_keyboard_events(_keyboard, sub_keyboard_event)
 
     """Play with RSL-RL agent."""
     # parse configuration
@@ -211,7 +221,10 @@ def run_sim():
     # initialize ROS2 node
     rclpy.init()
     base_node = RobotBaseNode(env_cfg.scene.num_envs)
-    add_cmd_sub(env_cfg.scene.num_envs)
+    # add_cmd_sub(env_cfg.scene.num_envs)
+    cmd_publisher = base_node.create_publisher(Twist, 'robot0/cmd_vel', 10)
+    add_keyboard_subscription(_input, _keyboard, cmd_publisher)
+    ros_obs_thread(ros_obs)
 
     annotator_lst = add_rtx_lidar(env_cfg.scene.num_envs, args_cli.robot, False)
     add_camera(env_cfg.scene.num_envs, args_cli.robot)
@@ -225,6 +238,10 @@ def run_sim():
         print(f"[INFO]: Simulation {i}")
         # run everything in inference mode
         with torch.inference_mode():
+            obs[0, 0:6] = ros_obs[0, 0:6]
+            obs[0, 9:36] = ros_obs[0, 9:36]
+            # print(f"[INFO]: Observation: {ros_obs[0, 0:36]}")
+            # print(f"[INFO]: Observation: {obs[0, 0:36]}")
             # agent stepping
             actions = policy(obs)
             # env stepping

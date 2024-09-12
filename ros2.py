@@ -120,8 +120,9 @@ def pub_robo_data_ros2(robot_type, num_envs, base_node, env, annotator_lst, star
         base_node.publish_joints(env.env.scene["robot"].data.joint_names, env.env.scene["robot"].data.joint_pos[i], i)
         base_node.publish_odom(env.env.scene["robot"].data.root_state_w[i, :3], env.env.scene["robot"].data.root_state_w[i, 3:7], i)
         base_node.publish_imu(env.env.scene["robot"].data.root_state_w[i, 3:7], env.env.scene["robot"].data.root_lin_vel_b[i, :], env.env.scene["robot"].data.root_ang_vel_b[i, :], i)
-        
-        
+        base_node.publish_default_joints(env.env.scene["robot"].data.joint_names, env.env.scene["robot"].data.default_joint_pos[i], i)
+        base_node.publish_joints_vel(env.env.scene["robot"].data.joint_names, env.env.scene["robot"].data.joint_vel[i] - env.env.scene["robot"].data.default_joint_vel[i], i)
+
         if robot_type == "go2":
             base_node.publish_robot_state([
                 env.env.scene["contact_forces"].data.net_forces_w[i][4][2], 
@@ -154,6 +155,8 @@ class RobotBaseNode(Node):
         self.go2_lidar_pub = []
         self.odom_pub = []
         self.imu_pub = []
+        self.default_joint_pub = []
+        self.joint_vel_pub = []
 
         for i in range(num_envs):
             self.joint_pub.append(self.create_publisher(JointState, f'robot{i}/joint_states', qos_profile))
@@ -161,8 +164,10 @@ class RobotBaseNode(Node):
             self.go2_lidar_pub.append(self.create_publisher(PointCloud2, f'robot{i}/point_cloud2', qos_profile))
             self.odom_pub.append(self.create_publisher(Odometry, f'robot{i}/odom', qos_profile))
             self.imu_pub.append(self.create_publisher(Imu, f'robot{i}/imu', qos_profile))
+            self.default_joint_pub.append(self.create_publisher(JointState, f'robot{i}/default_joint_states', qos_profile))
+            self.joint_vel_pub.append(self.create_publisher(JointState, f'robot{i}/joint_vel_states', qos_profile))
         self.broadcaster= TransformBroadcaster(self, qos=qos_profile)
-        
+
     def publish_joints(self, joint_names_lst, joint_state_lst, robot_num):
         # Create message
         joint_state = JointState()
@@ -179,6 +184,40 @@ class RobotBaseNode(Node):
         joint_state.name = joint_state_names_formated
         joint_state.position = joint_state_formated
         self.joint_pub[robot_num].publish(joint_state)
+
+    def publish_default_joints(self, joint_names_lst, joint_state_lst, robot_num):
+        # Create message
+        joint_state = JointState()
+        joint_state.header.stamp = self.get_clock().now().to_msg()
+
+        joint_state_names_formated = []
+        for joint_name in joint_names_lst:
+            joint_state_names_formated.append(f"robot{robot_num}/"+joint_name)
+
+        joint_state_formated = []
+        for joint_state_val in joint_state_lst:
+            joint_state_formated.append(joint_state_val.item())
+
+        joint_state.name = joint_state_names_formated
+        joint_state.position = joint_state_formated
+        self.default_joint_pub[robot_num].publish(joint_state)
+
+    def publish_joints_vel(self, joint_names_lst, joint_state_lst, robot_num):
+        # Create message
+        joint_state = JointState()
+        joint_state.header.stamp = self.get_clock().now().to_msg()
+
+        joint_state_names_formated = []
+        for joint_name in joint_names_lst:
+            joint_state_names_formated.append(f"robot{robot_num}/"+joint_name)
+
+        joint_state_formated = []
+        for joint_state_val in joint_state_lst:
+            joint_state_formated.append(joint_state_val.item())
+
+        joint_state.name = joint_state_names_formated
+        joint_state.position = joint_state_formated
+        self.joint_vel_pub[robot_num].publish(joint_state)
 
     def publish_odom(self, base_pos, base_rot, robot_num):
         odom_trans = TransformStamped()
