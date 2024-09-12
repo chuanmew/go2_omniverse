@@ -7,15 +7,16 @@ import carb
 
 
 class ActionPublisherNode(Node):
-    def __init__(self, obs):
+    def __init__(self):
         super().__init__('real_obs')
+        self.raw_actions = torch.zeros((1,12), dtype=torch.float32, device='cuda')
         self.default_joint_states = torch.zeros((1,12), dtype=torch.float32, device='cuda')
         self.ros_obs = torch.zeros((1,235), dtype=torch.float32, device='cuda')
-        self.ros_obs = obs
         self.create_subscription(Twist, f'robot0/cmd_vel', self.cmd_vel_callback('0'), 10)
         self.create_subscription(JointState, f'robot0/joint_states', self.joint_pos_callback('0'), 10)
         self.create_subscription(JointState, f'robot0/default_joint_states', self.default_joint_pos_callback('0'), 10)
         self.create_subscription(JointState, f'robot0/joint_vel_states', self.joint_vel_callback('0'), 10)
+        self.create_subscription(Float32MultiArray, 'raw_actions', self.raw_actions_callback('0'), 10)
         self.create_subscription(Imu, f'robot0/imu', self.imu_callback('0'), 10)
         self.publisher = self.create_publisher(Float32MultiArray, 'actions', 10)
         self.timer_period = 0.02  # 20 milliseconds
@@ -57,11 +58,17 @@ class ActionPublisherNode(Node):
                                             msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z], device='cuda')
         return callback
 
+    def raw_actions_callback(self, index: str):
+        def callback(msg: Float32MultiArray):
+            self.raw_actions = torch.tensor(msg.data, device='cuda')
+            self.ros_obs[0, 36:48] = self.raw_actions
+        return callback
+
     def generate_actions(self):
         indices = torch.tensor([1, 5, 9, 0, 4, 8, 3, 7, 11, 2, 6, 10])
-        processed_actions_ordered = self.ros_obs[0, 12 + indices].tolist()
+        action_tensor = self.raw_actions * 0.5 + self.default_joint_states
         action_msg = Float32MultiArray()
-        action_msg.data = processed_actions_ordered
+        action_msg.data = action_tensor[indices].tolist()
         self.publisher.publish(action_msg)
 
 

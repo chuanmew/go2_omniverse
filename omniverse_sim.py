@@ -220,7 +220,7 @@ def run_sim():
     # add_cmd_sub(env_cfg.scene.num_envs)
     cmd_publisher = base_node.create_publisher(Twist, 'robot0/cmd_vel', 10)
     add_keyboard_subscription(_input, _keyboard, cmd_publisher)
-    node = ActionPublisherNode(obs)
+    node = ActionPublisherNode()
     ros_obs_thread(node)
 
     annotator_lst = add_rtx_lidar(env_cfg.scene.num_envs, args_cli.robot, False)
@@ -236,14 +236,14 @@ def run_sim():
         # run everything in inference mode
         with torch.inference_mode():
             obs[0, 0:6] = node.ros_obs[0, 0:6]
-            obs[0, 9:36] = node.ros_obs[0, 9:36]
+            obs[0, 9:48] = node.ros_obs[0, 9:48]
             # print(f"[INFO]: Observation: {node.ros_obs[0, 0:36]}")
-            # print(f"[INFO]: Observation: {obs[0, 12:24]}")
+            print(f"[INFO]: Observation: {obs[0, 12:24]}")
             # agent stepping
             actions = policy(obs)
             # env stepping
             obs, _, _, _ = env.step(actions)
-            pub_robo_data_ros2(args_cli.robot, env_cfg.scene.num_envs, base_node, env, annotator_lst, start_time)
+            pub_robo_data_ros2(args_cli.robot, env_cfg.scene.num_envs, base_node, env, annotator_lst, start_time, actions)
     env.close()
 
 
