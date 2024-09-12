@@ -50,7 +50,7 @@ import omni.isaac.lab_tasks.manager_based.locomotion.velocity.mdp as mdp
 
 
 from robots.g1.config import G1_CFG
-
+from terrain_cfg import ROUGH_TERRAINS_CFG
 
 base_command = {}
 
@@ -69,9 +69,22 @@ class MySceneCfg(InteractiveSceneCfg):
     """Configuration for the terrain scene with a legged robot."""
 
     # ground terrain
+    # terrain = TerrainImporterCfg(
+    #     prim_path="/World/ground",
+    #     terrain_type="plane",
+    #     debug_vis=False,
+    # )
+
     terrain = TerrainImporterCfg(
         prim_path="/World/ground",
-        terrain_type="plane",
+        terrain_type="generator",
+        terrain_generator=ROUGH_TERRAINS_CFG,
+        physics_material=sim_utils.RigidBodyMaterialCfg(
+            friction_combine_mode="multiply",
+            restitution_combine_mode="multiply",
+            static_friction=1.0,
+            dynamic_friction=1.0,
+        ),
         debug_vis=False,
     )
 
