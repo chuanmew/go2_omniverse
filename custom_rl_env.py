@@ -274,6 +274,7 @@ class LocomotionVelocityRoughEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.dt = 0.005
         self.sim.disable_contact_processing = True
         self.sim.physics_material = self.scene.terrain.physics_material
+        # self.sim.gravity = [0.0, 0.0, -0.1]
 
         # update sensor update periods
         # we tick all the sensors based on the smallest update period (physics update period)

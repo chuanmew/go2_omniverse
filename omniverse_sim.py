@@ -238,9 +238,10 @@ def run_sim():
             obs[0, 0:6] = node.ros_obs[0, 0:6]
             obs[0, 9:48] = node.ros_obs[0, 9:48]
             # print(f"[INFO]: Observation: {node.ros_obs[0, 0:36]}")
-            print(f"[INFO]: Observation: {obs[0, 12:24]}")
             # agent stepping
             actions = policy(obs)
+            # actions[0, :] = torch.tensor([-0.2, 0.2, -0.9, 0.9, 0.9, 0.9, 0.5, 0.5, -2.6, -2.6, -2.6, -2.6], device='cuda') # lay down
+            # actions[0, :] = torch.tensor([0.0, 0.0, 0.0, 0.0, -0.0, -0.0, -0.0, -0.0, 0.0, 0.0, 0.0, 0.0], device='cuda') # stand
             # env stepping
             obs, _, _, _ = env.step(actions)
             pub_robo_data_ros2(args_cli.robot, env_cfg.scene.num_envs, base_node, env, annotator_lst, start_time, actions)
