@@ -8,7 +8,7 @@ from rclpy.duration import Duration
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 try:
-    from unitree_go.msg import LowState, WirelessController
+    from unitree_go.msg import LowState, WirelessController, SportModeState
     print("Modules imported successfully.")
 except ImportError as e:
     print(f"Error importing module: {e}")
@@ -26,20 +26,21 @@ class ActionPublisherNode(Node):
         self.raw_actions = torch.zeros((1,12), dtype=torch.float32, device='cuda')
         self.default_joint_states = torch.tensor([0.1, -0.1, 0.1, -0.1, 0.8, 0.8, 1.0, 1.0, -1.5, -1.5, -1.5, -1.5], dtype=torch.float32, device='cuda')
         self.ros_obs = torch.zeros((1,235), dtype=torch.float32, device='cuda')
+        self.create_subscription(Twist, f'robot0/cmd_vel', self.cmd_vel_callback('0'), 10)
 
         # for sim
-        self.create_subscription(Twist, f'robot0/cmd_vel', self.cmd_vel_callback('0'), 10)
-        self.create_subscription(JointState, f'robot0/joint_states', self.joint_pos_callback('0'), 10)
-        self.create_subscription(JointState, f'robot0/joint_vel_states', self.joint_vel_callback('0'), 10)
-        self.create_subscription(Imu, f'robot0/imu', self.imu_callback('0'), 10)
+        # self.create_subscription(JointState, f'robot0/joint_states', self.joint_pos_callback('0'), 10)
+        # self.create_subscription(JointState, f'robot0/joint_vel_states', self.joint_vel_callback('0'), 10)
+        # self.create_subscription(Imu, f'robot0/imu', self.imu_callback('0'), 10)
 
         # for real
-        # self.create_subscription(LowState, '/lowstate', self.lowstate_callback, 10)
-        # self.create_subscription(
-        #     WirelessController,
-        #     '/wirelesscontroller',
-        #     self.wireless_controller_callback,
-        #     10)
+        self.create_subscription(LowState, 'lowstate', self.lowstate_callback, 10)
+        self.create_subscription(SportModeState, 'sportmodestate', self.sportmodestate_callback, 10)
+        self.create_subscription(
+            WirelessController,
+            '/wirelesscontroller',
+            self.wireless_controller_callback,
+            10)
 
         self.create_subscription(Float32MultiArray, 'raw_actions', self.raw_actions_callback('0'), 10)
         self.publisher = self.create_publisher(Float32MultiArray, 'actions', 10)
@@ -107,22 +108,24 @@ class ActionPublisherNode(Node):
             msg.motor_state[8].dq,  # 11 -> RR_calf_joint  to RR_calf  -> 8
         ]
         imu_quaternion = np.array([
-            msg.imu_state.quaternion[0],
             msg.imu_state.quaternion[1],
             msg.imu_state.quaternion[2],
-            msg.imu_state.quaternion[3]
+            msg.imu_state.quaternion[3],
+            msg.imu_state.quaternion[0]
         ])
-        self.ros_obs[0, 6:9] = self.projected_gravity_vector(imu_quaternion)
-        self.ros_obs[0, 0:6] = torch.tensor([msg.imu_state.accelerometer[0], msg.imu_state.accelerometer[1], msg.imu_state.accelerometer[2],
-                                            msg.imu_state.gyroscope[0], msg.imu_state.gyroscope[1], msg.imu_state.gyroscope[2]], device='cuda')
+        self.ros_obs[0, 6:9] = torch.tensor(self.projected_gravity_vector(imu_quaternion), device='cuda')
+        self.ros_obs[0, 3:6] = torch.tensor([msg.imu_state.gyroscope[0], msg.imu_state.gyroscope[1], msg.imu_state.gyroscope[2]], device='cuda')
         self.ros_obs[0, 12:24] = torch.tensor(motor_qs, device='cuda') - self.default_joint_states
         self.ros_obs[0, 24:36] = torch.tensor(motor_dqs, device='cuda')
+
+    def sportmodestate_callback(self, msg):
+        self.ros_obs[0, 0:3] = torch.tensor([msg.velocity[0], msg.velocity[1], msg.velocity[2]], device='cuda')
 
     def projected_gravity_vector(self, imu_quaternion):
         # Use rotation from quaternion to find proj g
         rotation = R.from_quat(imu_quaternion)
         gravity_vec_w = np.array([0.0, 0.0, -1.0])  # Gravity vector in world
-        gravity_proj = -1 * rotation.apply(gravity_vec_w)
+        gravity_proj = rotation.apply(gravity_vec_w)
         return gravity_proj
 
     def wireless_controller_callback(self, msg):
@@ -130,14 +133,14 @@ class ActionPublisherNode(Node):
         self.twist.linear.x = msg.ly * self.speed
         self.twist.linear.y = msg.lx * -self.speed  # (sign convention switch)
         self.twist.angular.z = msg.rx * self.turn
-        self.ros_obs[0, 9:12] = torch.tensor([self.twist.linear.x, self.twist.linear.y, self.twist.linear.z], device='cuda')
+        self.ros_obs[0, 9:12] = torch.tensor([self.twist.linear.x, self.twist.linear.y, self.twist.angular.z], device='cuda')
         # Update the last message time
         self.last_msg_time = self.get_clock().now()
 
     def check_timeout(self):
         if self.get_clock().now() - self.last_msg_time > self.timeout_duration:
             zero_twist = Twist()
-            self.ros_obs[0, 9:12] = torch.tensor([zero_twist.linear.x, zero_twist.linear.y, zero_twist.linear.z], device='cuda')
+            self.ros_obs[0, 9:12] = torch.tensor([zero_twist.linear.x, zero_twist.linear.y, zero_twist.angular.z], device='cuda')
 
     def raw_actions_callback(self, index: str):
         def callback(msg: Float32MultiArray):

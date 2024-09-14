@@ -113,7 +113,7 @@ def add_camera(num_envs, robot_type):
         Camera(cameraCfg)
 
 
-def pub_robo_data_ros2(robot_type, num_envs, base_node, env, annotator_lst, start_time, actions):
+def pub_robo_data_ros2(robot_type, num_envs, base_node, env, annotator_lst, start_time):
 
     for i in range(num_envs):
         # publish ros2 info
@@ -122,7 +122,6 @@ def pub_robo_data_ros2(robot_type, num_envs, base_node, env, annotator_lst, star
         base_node.publish_imu(env.env.scene["robot"].data.root_state_w[i, 3:7], env.env.scene["robot"].data.root_lin_vel_b[i, :], env.env.scene["robot"].data.root_ang_vel_b[i, :], i)
         base_node.publish_default_joints(env.env.scene["robot"].data.joint_names, env.env.scene["robot"].data.default_joint_pos[i], i)
         base_node.publish_joints_vel(env.env.scene["robot"].data.joint_names, env.env.scene["robot"].data.joint_vel[i] - env.env.scene["robot"].data.default_joint_vel[i], i)
-        base_node.publish_raw_actions(actions)
 
         if robot_type == "go2":
             base_node.publish_robot_state([
