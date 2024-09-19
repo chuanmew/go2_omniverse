@@ -236,22 +236,21 @@ def run_sim():
         # run everything in inference mode
         with torch.inference_mode():
             obs[0, 9:12] = node.ros_obs[0, 9:12] # control using wirelesscontroller
-            obs[0, 36:48] = node.ros_obs[0, 36:48] # actions loop back
+            # obs[0, 36:48] = node.ros_obs[0, 36:48] # actions loop back
             print(f"[INFO]: velocity_commands: {node.ros_obs[0, 9:12]}")
-            if i > 30:
-                pass
+            # if i > 30:
                 # obs[0, 3:9] = node.ros_obs[0, 3:9] # real ang_vel and gravity
                 # obs[0, 12:36] = node.ros_obs[0, 12:36] # real joint pos and vel
 
             # print(f"[INFO]: Observation: {node.ros_obs[0, 0:36]}")
             # agent stepping
             actions = policy(obs)
-            base_node.publish_raw_actions(actions)
-            # actions[0, :] = torch.tensor([-0.2, 0.2, -0.9, 0.9, 0.9, 0.9, 0.5, 0.5, -2.6, -2.6, -2.6, -2.6], device='cuda') # lay down
-            # actions[0, :] = torch.tensor([0.0, 0.0, 0.0, 0.0, -0.0, -0.0, -0.0, -0.0, 0.0, 0.0, 0.0, 0.0], device='cuda') # stand
+            # actions[0, :] = torch.tensor([-0.2, 0.2, -0.2, 0.2, 0.9, 0.9, 0.5, 0.5, -2.6, -2.6, -2.6, -2.6], device='cuda') # real and sim lay down
+            # actions[0, :] = torch.tensor([0.0, 0.0, 0.0, 0.0, -0.0, -0.0, -0.0, -0.0, 0.0, 0.0, 0.0, 0.0], device='cuda') # real stand
+            base_node.publish_raw_actions(actions[0, :])
             # env stepping
             obs, _, _, _ = env.step(actions)
-            # pub_robo_data_ros2(args_cli.robot, env_cfg.scene.num_envs, base_node, env, annotator_lst, start_time)
+            pub_robo_data_ros2(args_cli.robot, env_cfg.scene.num_envs, base_node, env, annotator_lst, start_time)
     env.close()
 
 

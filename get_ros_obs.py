@@ -24,7 +24,21 @@ class ActionPublisherNode(Node):
         self.timeout_duration = Duration(seconds=0.5)
         self.timer = self.create_timer(0.1, self.check_timeout)
         self.raw_actions = torch.zeros((1,12), dtype=torch.float32, device='cuda')
-        self.default_joint_states = torch.tensor([0.1, -0.1, 0.1, -0.1, 0.8, 0.8, 1.0, 1.0, -1.5, -1.5, -1.5, -1.5], dtype=torch.float32, device='cuda')
+        self.default_joint_states = torch.tensor([0.2, -0.2, 0.2, -0.2, 0.8, 0.8, 1.0, 1.0, -1.8, -1.8, -1.8, -1.8], dtype=torch.float32, device='cuda')
+        self.motor_limits_ordered = [
+            [-0.437, 0.437],  # Front Hip
+            [-0.490, 1.570],  # Front Thigh
+            [-2.720, -0.9],  # Front Calf
+            [-0.437, 0.437],  # Front Hip
+            [-0.490, 1.570],  # Front Thigh
+            [-2.720, -0.9],  # Front Calf
+            [-0.437, 0.437],  # Rear Hip
+            [-0.530, 1.570],  # Rear Thigh
+            [-2.720, -0.9],  # Rear Calf
+            [-0.437, 0.437],  # Rear Hip
+            [-0.530, 1.570],  # Rear Thigh
+            [-2.720, -0.9]   # Rear Calf
+        ]
         self.ros_obs = torch.zeros((1,235), dtype=torch.float32, device='cuda')
         self.create_subscription(Twist, f'robot0/cmd_vel', self.cmd_vel_callback('0'), 10)
 
@@ -150,9 +164,14 @@ class ActionPublisherNode(Node):
 
     def generate_actions(self):
         indices = torch.tensor([1, 5, 9, 0, 4, 8, 3, 7, 11, 2, 6, 10])
-        action_tensor =  self.raw_actions * 0.5 + self.default_joint_states
+        action_tensor =  self.raw_actions * 0.25 + self.default_joint_states
         action_msg = Float32MultiArray()
         action_msg.data = action_tensor[indices].tolist()
+        for i, action in enumerate(action_msg.data):
+            min_limit, max_limit = self.motor_limits_ordered[i]
+            min_limit = min_limit * 0.95
+            max_limit = max_limit * 0.95
+            action_msg.data[i] = max(min(action, max_limit), min_limit)
         self.publisher.publish(action_msg)
 
 

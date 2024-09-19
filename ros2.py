@@ -222,7 +222,7 @@ class RobotBaseNode(Node):
 
     def publish_raw_actions(self, raw_actions):
         action_msg = Float32MultiArray()
-        action_msg.data = raw_actions[0,:].tolist()
+        action_msg.data = raw_actions.tolist()
         self.raw_actions_pub.publish(action_msg)
 
     def publish_odom(self, base_pos, base_rot, robot_num):
